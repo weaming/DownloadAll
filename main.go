@@ -100,13 +100,14 @@ func downloadImage(url, out string) {
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal("Trouble reading reesponse body!")
+		log.Println("Trouble reading reesponse body!")
+		return
 	}
 
 	err = ioutil.WriteFile(out, contents, 0644)
 	if err != nil {
-		log.Fatal("Trouble creating file: ", err)
-	} else {
-		count += 1
+		log.Println("Trouble creating file!")
+		return
 	}
+	count += 1
 }
