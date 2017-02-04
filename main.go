@@ -8,8 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	//"strings"
 	fp "path/filepath"
+	"strings"
 )
 
 func fatal(err error) {
@@ -45,7 +45,10 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		url := scanner.Text()
+		url := strings.Trim(scanner.Text())
+		if strings.HasPrefix(url, "#") {
+			continue
+		}
 		downloadImage(url, fp.Join(outdir, fp.Base(url)))
 	}
 
