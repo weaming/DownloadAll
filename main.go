@@ -40,7 +40,8 @@ func main() {
 	outdir := "./Downloads"
 
 	if infile == "" {
-		fmt.Fprintf(os.Stderr, "Please give the pictures url file(one url each line)")
+		fmt.Fprintf(os.Stderr, "Please give the pictures url file(one url each line)\n")
+		os.Exit(1)
 	}
 	if flag.Arg(1) != "" {
 		outdir = flag.Arg(1)
