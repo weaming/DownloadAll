@@ -45,7 +45,7 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		url := strings.Trim(scanner.Text())
+		url := strings.Trim(scanner.Text(), " \r\n\t")
 		if strings.HasPrefix(url, "#") {
 			continue
 		}
@@ -56,7 +56,14 @@ func main() {
 }
 
 func downloadImage(url, out string) {
-	fmt.Printf("%v => %v\n", url, out)
+
+	var _, err = os.Stat(out)
+	if err == nil {
+		log.Printf("Ignore existed: %v => %v\n", url, out)
+		return
+	} else {
+		log.Printf("%v => %v\n", url, out)
+	}
 
 	resp, err := http.Get(url)
 	defer resp.Body.Close()
