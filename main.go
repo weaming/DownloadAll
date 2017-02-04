@@ -10,7 +10,10 @@ import (
 	"os"
 	fp "path/filepath"
 	"strings"
+	"time"
 )
+
+var count = 0
 
 func fatal(err error) {
 	if err != nil {
@@ -19,6 +22,12 @@ func fatal(err error) {
 }
 
 func main() {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		log.Printf("Downloaded %v files took %s", count, elapsed)
+	}()
+
 	flag.Parse()
 	infile := flag.Arg(0)
 	outdir := "./Downloads"
@@ -46,7 +55,7 @@ func main() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		url := strings.Trim(scanner.Text(), " \r\n\t")
-		if strings.HasPrefix(url, "#") {
+		if strings.HasPrefix(url, "#") || url == "" {
 			continue
 		}
 		downloadImage(url, fp.Join(outdir, fp.Base(url)))
@@ -80,5 +89,7 @@ func downloadImage(url, out string) {
 	err = ioutil.WriteFile(out, contents, 0644)
 	if err != nil {
 		log.Fatal("Trouble creating file: ", err)
+	} else {
+		count += 1
 	}
 }
