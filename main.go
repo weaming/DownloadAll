@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+// HTTP GET timeout
+const TIMEOUT = 20
+
+// HTTP concurrence pool size
+const CLIENT_POOL = 10
+
+var pool = make(chan int, CLIENT_POOL)
 var count = 0
 
 func fatal(err error) {
@@ -58,13 +65,15 @@ func main() {
 		if strings.HasPrefix(url, "#") || url == "" {
 			continue
 		}
-		downloadImage(url, fp.Join(outdir, fp.Base(url)))
+		pool <- 1
+		go downloadImage(url, fp.Join(outdir, fp.Base(url)))
 	}
 
 	fatal(scanner.Err())
 }
 
 func downloadImage(url, out string) {
+	defer func() { <-pool }()
 
 	var _, err = os.Stat(out)
 	if err == nil {
@@ -74,12 +83,19 @@ func downloadImage(url, out string) {
 		log.Printf("%v => %v\n", url, out)
 	}
 
-	resp, err := http.Get(url)
-	defer resp.Body.Close()
+	c := &http.Client{
+		Timeout: TIMEOUT * time.Second,
+	}
+	resp, err := c.Get(url)
 
 	if err != nil {
-		log.Fatal("Trouble making GET photo request!")
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+		log.Println("Trouble making GET photo request!")
+		return
 	}
+	defer resp.Body.Close()
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
