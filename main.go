@@ -17,7 +17,7 @@ import (
 const TIMEOUT = 20
 
 // HTTP concurrence pool size
-const CLIENT_POOL = 10
+const CLIENT_POOL = 20
 
 var pool = make(chan int, CLIENT_POOL)
 var count = 0
@@ -75,6 +75,11 @@ func main() {
 
 func downloadImage(url, out string) {
 	defer func() { <-pool }()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in downloadImage(): ", r)
+		}
+	}()
 
 	var _, err = os.Stat(out)
 	if err == nil {
