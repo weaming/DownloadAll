@@ -10,6 +10,7 @@ import (
 	"os"
 	fp "path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,7 +21,16 @@ const TIMEOUT = 20
 const CLIENT_POOL = 20
 
 var pool = make(chan int, CLIENT_POOL)
+var wg sync.WaitGroup
 var count = 0
+var outdir = "./Downloads"
+
+var client = &http.Client{
+	Transport: &http.Transport{
+		MaxIdleConnsPerHost: 30,
+	},
+	Timeout: TIMEOUT * time.Second,
+}
 
 func fatal(err error) {
 	if err != nil {
@@ -29,16 +39,13 @@ func fatal(err error) {
 }
 
 func main() {
-	start := time.Now()
-	defer func() {
-		elapsed := time.Since(start)
-		log.Printf("Downloaded %v files took %s", count, elapsed)
-	}()
-
+	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s FILE\n\nThe FILE is the text files contains URLs line by line.\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	infile := flag.Arg(0)
-	outdir := "./Downloads"
-
 	if infile == "" {
 		fmt.Fprintf(os.Stderr, "Please give the pictures url file(one url each line)\n")
 		os.Exit(1)
@@ -46,6 +53,12 @@ func main() {
 	if flag.Arg(1) != "" {
 		outdir = flag.Arg(1)
 	}
+
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		log.Printf("Downloaded %v files took %s", count, elapsed)
+	}()
 
 	// create file if not exists
 	var _, err = os.Stat(outdir)
@@ -56,25 +69,32 @@ func main() {
 		}
 	}
 
-	file, err := os.Open(infile)
+	infd, err := os.Open(infile)
 	fatal(err)
-	defer file.Close()
+	defer infd.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(infd)
 	for scanner.Scan() {
 		url := strings.Trim(scanner.Text(), " \r\n\t")
 		if strings.HasPrefix(url, "#") || url == "" {
 			continue
 		}
+		wg.Add(1)
 		pool <- 1
 		go downloadImage(url, fp.Join(outdir, fp.Base(url)))
 	}
 
+	// wait all goroutine to finish
+	wg.Wait()
 	fatal(scanner.Err())
 }
 
 func downloadImage(url, out string) {
-	defer func() { <-pool }()
+	defer func() {
+		<-pool
+		wg.Done()
+	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in downloadImage(): ", r)
@@ -86,22 +106,19 @@ func downloadImage(url, out string) {
 		log.Printf("Ignore existed: %v => %v\n", url, out)
 		return
 	} else {
-		log.Printf("%v => %v\n", url, out)
+		defer log.Printf("%v => %v\n", url, out)
 	}
 
-	c := &http.Client{
-		Timeout: TIMEOUT * time.Second,
+	resp, err := client.Get(url)
+
+	if resp.Body != nil {
+		defer resp.Body.Close()
 	}
-	resp, err := c.Get(url)
 
 	if err != nil {
-		if resp.Body != nil {
-			resp.Body.Close()
-		}
 		log.Println("Trouble making GET photo request!")
 		return
 	}
-	defer resp.Body.Close()
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
