@@ -24,6 +24,7 @@ var pool = make(chan int, CLIENT_POOL)
 var wg sync.WaitGroup
 var count = 0
 var outdir = "./Downloads"
+var outSuffix = ""
 
 var client = &http.Client{
 	Transport: &http.Transport{
@@ -40,11 +41,13 @@ func fatal(err error) {
 
 func main() {
 	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
+	flag.StringVar(&outSuffix, "s", outSuffix, "Add suffix to saved file name")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s FILE\n\nThe FILE is the text files contains URLs line by line.\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
 	infile := flag.Arg(0)
 	if infile == "" {
 		fmt.Fprintf(os.Stderr, "Please give the pictures url file(one url each line)\n")
@@ -79,9 +82,17 @@ func main() {
 		if strings.HasPrefix(url, "#") || url == "" {
 			continue
 		}
+
+		// add to wait group and HTTP pool
 		wg.Add(1)
 		pool <- 1
-		go downloadImage(url, fp.Join(outdir, fp.Base(url)))
+
+		// file name
+		outName := fp.Base(url)
+		if !strings.HasSuffix(outName, outSuffix) {
+			outName += outSuffix
+		}
+		go downloadImage(url, fp.Join(outdir, outName))
 	}
 
 	// wait all goroutine to finish
