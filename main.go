@@ -24,6 +24,7 @@ var pool = make(chan int, CLIENT_POOL)
 var wg sync.WaitGroup
 var count = 0
 var outdir = "./Downloads"
+var outPrefix = ""
 var outSuffix = ""
 
 var client = &http.Client{
@@ -41,6 +42,7 @@ func fatal(err error) {
 
 func main() {
 	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
+	flag.StringVar(&outPrefix, "p", outPrefix, "Add prefix to saved file name")
 	flag.StringVar(&outSuffix, "s", outSuffix, "Add suffix to saved file name")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s FILE\n\nThe FILE is the text files contains URLs line by line.\n\n", os.Args[0])
@@ -89,9 +91,14 @@ func main() {
 
 		// file name
 		outName := fp.Base(url)
+		if !strings.HasPrefix(outName, outPrefix) {
+			outName = outPrefix + outName
+		}
 		if !strings.HasSuffix(outName, outSuffix) {
 			outName += outSuffix
 		}
+
+		// go to download it!
 		go downloadImage(url, fp.Join(outdir, outName))
 	}
 
