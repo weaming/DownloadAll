@@ -23,6 +23,7 @@ const CLIENT_POOL = 20
 var pool = make(chan int, CLIENT_POOL)
 var wg sync.WaitGroup
 var count = 0
+var countIgnore = 0
 var outdir = "./Downloads"
 var outPrefix = ""
 var outSuffix = ""
@@ -62,7 +63,7 @@ func main() {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		log.Printf("Downloaded %v files took %s", count, elapsed)
+		log.Printf("Downloaded %v files took %s, ignored %v", count, elapsed, countIgnore)
 	}()
 
 	// create file if not exists
@@ -122,6 +123,7 @@ func downloadImage(url, out string) {
 	var _, err = os.Stat(out)
 	if err == nil {
 		log.Printf("Ignore existed: %v => %v\n", url, out)
+		countIgnore += 1
 		return
 	} else {
 		defer log.Printf("%v => %v\n", url, out)
