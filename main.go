@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	urllib "net/url"
 	"os"
 	fp "path/filepath"
 	"strings"
@@ -25,6 +26,7 @@ var wg sync.WaitGroup
 var count = 0
 var countIgnore = 0
 var outdir = "./Downloads"
+var fullName = false
 var outPrefix = ""
 var outSuffix = ""
 var checkExistDirs arrayFlags
@@ -59,6 +61,7 @@ func (i *arrayFlags) Set(value string) error {
 
 func main() {
 	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
+	flag.BoolVar(&fullName, "full", fullName, "Whether to use URL path replaced slash(/) by - as the saved file name")
 	flag.StringVar(&outPrefix, "p", outPrefix, "Add prefix to saved file name")
 	flag.StringVar(&outSuffix, "s", outSuffix, "Add suffix to saved file name")
 	flag.Var(&checkExistDirs, "d", "Optional extra directories to check whether file existed")
@@ -116,7 +119,18 @@ func main() {
 		pool <- 1
 
 		// file name
-		outName := fp.Base(url)
+		outName := ""
+		if fullName {
+			u, err := urllib.Parse(url)
+			if err != nil {
+				log.Printf("Parse URL failed: %v", url)
+				continue
+			}
+			outName = strings.Replace(u.Path, "/", "-", -1)
+			outName = strings.Trim(outName, "-")
+		} else {
+			outName = fp.Base(url)
+		}
 		if !strings.HasPrefix(outName, outPrefix) {
 			outName = outPrefix + outName
 		}
