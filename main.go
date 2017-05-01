@@ -27,6 +27,7 @@ var countIgnore = 0
 var outdir = "./Downloads"
 var outPrefix = ""
 var outSuffix = ""
+var checkExistDirs arrayFlags
 
 var client = &http.Client{
 	Transport: &http.Transport{
@@ -41,14 +42,32 @@ func fatal(err error) {
 	}
 }
 
+// array flags: {{
+
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return "hello"
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+// }}
+
 func main() {
 	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
 	flag.StringVar(&outPrefix, "p", outPrefix, "Add prefix to saved file name")
 	flag.StringVar(&outSuffix, "s", outSuffix, "Add suffix to saved file name")
+	flag.Var(&checkExistDirs, "d", "Optional extra directories to check whether file existed")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s FILE\n\nThe FILE is the text files contains URLs line by line.\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
+	// call Parse() first!
 	flag.Parse()
 
 	infile := flag.Arg(0)
@@ -100,7 +119,7 @@ func main() {
 		}
 
 		// go to download it!
-		go downloadImage(url, fp.Join(outdir, outName))
+		go downloadImage(url, outdir, outName)
 	}
 
 	// wait all goroutine to finish
@@ -108,7 +127,7 @@ func main() {
 	fatal(scanner.Err())
 }
 
-func downloadImage(url, out string) {
+func downloadImage(url, outDir, outName string) {
 	defer func() {
 		<-pool
 		wg.Done()
@@ -120,12 +139,24 @@ func downloadImage(url, out string) {
 		}
 	}()
 
+	out := fp.Join(outdir, outName)
 	var _, err = os.Stat(out)
 	if err == nil {
 		log.Printf("Ignore existed: %v => %v\n", url, out)
 		countIgnore += 1
 		return
 	} else {
+		// check multiple directories: {{
+		for _, dir := range checkExistDirs {
+			tmp := fp.Join(dir, outName)
+			var _, err = os.Stat(tmp)
+			if err == nil {
+				log.Printf("Ignore existed: %v => %v\n", url, tmp)
+				countIgnore += 1
+				return
+			}
+		}
+		// }}
 		defer log.Printf("%v => %v\n", url, out)
 	}
 
