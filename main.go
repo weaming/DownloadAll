@@ -99,10 +99,16 @@ func main() {
 	defer infd.Close()
 
 	scanner := bufio.NewScanner(infd)
+	countScanned := 0
 	for scanner.Scan() {
 		url := strings.Trim(scanner.Text(), " \r\n\t")
 		if strings.HasPrefix(url, "#") || url == "" {
 			continue
+		} else {
+			countScanned += 1
+			if countScanned%500 == 0 {
+				log.Printf("Scanned count: %v", countScanned)
+			}
 		}
 
 		// add to wait group and HTTP pool
