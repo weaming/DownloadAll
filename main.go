@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	urllib "net/url"
@@ -26,6 +27,7 @@ var count = 0
 var countIgnore = 0
 var outdir = "./Downloads"
 var fullName = false
+var multiParts = false
 var outPrefix = ""
 var outSuffix = ""
 var checkExistDirs arrayFlags
@@ -61,6 +63,7 @@ func (i *arrayFlags) Set(value string) error {
 func main() {
 	flag.StringVar(&outdir, "o", outdir, "Directory to save files")
 	flag.BoolVar(&fullName, "full", fullName, "Whether to use URL path replaced slash(/) by - as the saved file name")
+	flag.BoolVar(&multiParts, "multi", multiParts, "Whether to download the file by multiple parts, may cause incomplete if stopped in the halfway")
 	flag.StringVar(&outPrefix, "p", outPrefix, "Add prefix to saved file name")
 	flag.StringVar(&outSuffix, "s", outSuffix, "Add suffix to saved file name")
 	flag.Var(&checkExistDirs, "d", "Optional extra directories to check whether file existed")
@@ -179,7 +182,37 @@ func downloadImage(url, outDir, outName string) {
 		defer log.Printf("%v => %v\n", url, out)
 	}
 
-	multiRangeDownload(url, out)
+	if multiParts {
+		multiRangeDownload(url, out)
+	} else {
+		downloadAsOne(url, out)
+	}
+}
+
+func downloadAsOne(url, out string) {
+	resp, err := client.Get(url)
+
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	if err != nil {
+		log.Println("Trouble making GET photo request!")
+		return
+	}
+
+	contents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("Trouble reading reesponse body!")
+		return
+	}
+
+	err = ioutil.WriteFile(out, contents, 0644)
+	if err != nil {
+		log.Println("Trouble creating file!")
+		return
+	}
+	count += 1
 }
 
 func multiRangeDownload(url, out string) {
