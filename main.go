@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	urllib "net/url"
@@ -159,7 +158,7 @@ func downloadImage(url, outDir, outName string) {
 		}
 	}()
 
-	out := fp.Join(outdir, outName)
+	out := fp.Join(outDir, outName)
 	var _, err = os.Stat(out)
 	if err == nil {
 		log.Printf("Ignore existed: %v => %v\n", url, out)
@@ -180,27 +179,53 @@ func downloadImage(url, outDir, outName string) {
 		defer log.Printf("%v => %v\n", url, out)
 	}
 
-	resp, err := client.Get(url)
+	multiRangeDownload(url, out)
+}
 
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
+func multiRangeDownload(url, out string) {
+	outfile, err := os.Create(out)
 	if err != nil {
-		log.Println("Trouble making GET photo request!")
+		log.Println(err)
+		return
+	}
+	defer outfile.Close()
+
+	FileDownloader, err := NewFileDownloader(url, outfile, -1)
+	if err != nil {
+		log.Println(err)
 		return
 	}
 
-	contents, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("Trouble reading reesponse body!")
-		return
-	}
+	var _wg sync.WaitGroup
+	var exit = make(chan bool)
+	FileDownloader.OnFinish(func() {
+		exit <- true
+		count += 1
+	})
 
-	err = ioutil.WriteFile(out, contents, 0644)
-	if err != nil {
-		log.Println("Trouble creating file!")
-		return
-	}
-	count += 1
+	FileDownloader.OnError(func(errCode int, err error) {
+		log.Println(errCode, err)
+	})
+
+	FileDownloader.OnStart(func() {
+		for {
+			//status := FileDownloader.GetStatus()
+			//var i = float64(status.Downloaded) / float64(FileDownloader.Size) * 50
+			//h := strings.Repeat("=", int(i)) + strings.Repeat(" ", 50-int(i))
+
+			select {
+			case <-exit:
+				//format := "%v/%v [%s] %v byte/s %v\n"
+				//fmt.Printf(format, status.Downloaded, FileDownloader.Size, h, 0, "[FINISH]")
+				_wg.Done()
+			default:
+				time.Sleep(time.Second * 1)
+				os.Stdout.Sync()
+			}
+		}
+	})
+
+	_wg.Add(1)
+	FileDownloader.Start()
+	_wg.Wait()
 }
