@@ -25,6 +25,7 @@ var pool = make(chan int, CLIENT_POOL)
 var wg sync.WaitGroup
 var count = 0
 var countIgnore = 0
+var countError = 0
 var outdir = "./Downloads"
 var fullName = false
 var multiParts = false
@@ -87,7 +88,7 @@ func main() {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		log.Printf("Downloaded %v files took %s, ignored %v", count, elapsed, countIgnore)
+		log.Printf("Downloaded %v files took %s, ignored %v, error %v", count, elapsed, countIgnore, countError)
 	}()
 
 	// create file if not exists
@@ -188,22 +189,23 @@ func downloadAsOne(url, out string) {
 
 	if err != nil {
 		log.Println("Trouble making GET photo request!")
+		countError += 1
 		return
 	}
 
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("Trouble reading reesponse body!")
+		log.Println("Trouble reading response body!")
+		countError += 1
 		return
 	}
 
 	err = ioutil.WriteFile(out, contents, 0644)
 	if err != nil {
 		log.Println("Trouble creating file!")
+		countError += 1
 		return
 	}
 	count += 1
@@ -232,6 +234,7 @@ func multiRangeDownload(url, out string) {
 
 	FileDownloader.OnError(func(errCode int, err error) {
 		log.Println(errCode, err)
+		countError += 1
 	})
 
 	FileDownloader.OnStart(func() {
