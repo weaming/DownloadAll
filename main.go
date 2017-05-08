@@ -155,12 +155,6 @@ func downloadImage(url, outDir, outName string) {
 		wg.Done()
 	}()
 
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in downloadImage(): ", r)
-		}
-	}()
-
 	out := fp.Join(outDir, outName)
 	var _, err = os.Stat(out)
 	if err == nil {
@@ -192,13 +186,13 @@ func downloadImage(url, outDir, outName string) {
 func downloadAsOne(url, out string) {
 	resp, err := client.Get(url)
 
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
 	if err != nil {
 		log.Println("Trouble making GET photo request!")
 		return
+	}
+
+	if resp.Body != nil {
+		defer resp.Body.Close()
 	}
 
 	contents, err := ioutil.ReadAll(resp.Body)
